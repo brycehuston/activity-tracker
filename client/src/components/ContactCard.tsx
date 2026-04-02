@@ -98,16 +98,30 @@ function getChartDomain(data: TrackerData[]) {
     ] as const;
 }
 
-function smoothMetricSeries(values: number[], damping: number, deltaFactor: number) {
+function getMedian(values: number[]) {
+    if (values.length === 0) return 150;
+
+    const sorted = [...values].sort((a, b) => a - b);
+    const middle = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0
+        ? (sorted[middle - 1] + sorted[middle]) / 2
+        : sorted[middle];
+}
+
+function smoothMetricSeries(values: number[], damping: number, deltaFactor: number, initialValue?: number) {
     if (values.length === 0) return values;
 
+    const seedValue = Number.isFinite(initialValue)
+        ? Number(initialValue)
+        : (Number.isFinite(values[0]) ? values[0] : 150);
+
     const smoothed: number[] = [];
-    let prev = Number.isFinite(values[0]) ? values[0] : 0;
-    smoothed.push(prev);
+    let prev = seedValue;
+    smoothed.push(Math.round(prev * 10) / 10);
 
     for (let i = 1; i < values.length; i += 1) {
         const rawValue = Number.isFinite(values[i]) ? values[i] : prev;
-        const maxDelta = Math.max(6, Math.abs(prev) * deltaFactor);
+        const maxDelta = Math.max(8, Math.abs(prev) * deltaFactor);
         const limited = prev + Math.max(-maxDelta, Math.min(maxDelta, rawValue - prev));
         const next = prev + (limited - prev) * damping;
         prev = Number.isFinite(next) ? next : prev;
@@ -120,9 +134,15 @@ function smoothMetricSeries(values: number[], damping: number, deltaFactor: numb
 function buildDisplayChartData(data: TrackerData[]) {
     if (data.length <= 2) return data;
 
-    const rttSeries = smoothMetricSeries(data.map((point) => point.rtt), 0.36, 0.24);
-    const avgSeries = smoothMetricSeries(data.map((point) => point.avg), 0.44, 0.2);
-    const thresholdSeries = smoothMetricSeries(data.map((point) => point.threshold), 0.5, 0.16);
+    const baselineWindow = data.slice(-12);
+    const baselineValues = baselineWindow
+        .flatMap((point) => [point.avg, point.median, point.threshold, point.rtt])
+        .filter((value) => Number.isFinite(value) && value > 0 && value < 350);
+    const baseline = Math.max(150, Math.round(getMedian(baselineValues.length > 0 ? baselineValues : [150])));
+
+    const rttSeries = smoothMetricSeries(data.map((point) => point.rtt), 0.22, 0.14, baseline);
+    const avgSeries = smoothMetricSeries(data.map((point) => point.avg), 0.28, 0.1, baseline);
+    const thresholdSeries = smoothMetricSeries(data.map((point) => point.threshold), 0.34, 0.08, baseline);
 
     return data.map((point, index) => ({
         ...point,
@@ -243,10 +263,10 @@ export function ContactCard({
             { label: 'Active Threshold', value: formatMetricValue(lastData?.threshold, 'ms') }
         ];
     const analyticsSummary = [
-        { label: 'Messages', hint: '1h / 24h' },
-        { label: 'Calls', hint: '1h / 24h' },
-        { label: 'Repeat Caller', hint: analyticsData.repeatedCallerCount > 0 ? `${analyticsData.repeatedCallerCount} repeats` : 'No repeats' },
-        { label: 'Top Source', hint: analyticsData.topSourceEvents24h > 0 ? `${analyticsData.topSourceEvents24h} events` : 'No events' }
+        { label: 'Messages', value: `${analyticsData.messageCount1h} / ${analyticsData.messageCount24h}`, hint: '1h / 24h' },
+        { label: 'Calls', value: `${analyticsData.callCount1h} / ${analyticsData.callCount24h}`, hint: '1h / 24h' },
+        { label: 'Repeat Caller', value: analyticsData.repeatedCallerFingerprint || 'None', hint: analyticsData.repeatedCallerCount > 0 ? `${analyticsData.repeatedCallerCount} repeats` : 'No repeats' },
+        { label: 'Top Source', value: analyticsData.topSourceFingerprint || 'None', hint: analyticsData.topSourceEvents24h > 0 ? `${analyticsData.topSourceEvents24h} events` : 'No events' }
     ];
     const showChartDots = chartData.length <= 2;
 
@@ -263,9 +283,9 @@ export function ContactCard({
             {/* Header with Stop Button */}
             <div className={`border-b px-5 py-3 sm:px-6 sm:py-3.5 ${isDarkMode ? 'border-white/10' : 'border-slate-300/55'}`}>
                 <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[minmax(220px,260px)_minmax(0,1fr)_auto] xl:items-center xl:gap-4">
-                    <div className="min-w-0">
+                    <div className="min-w-0 pl-3 sm:pl-4">
                         <p className={`fine-copy text-[10px] ${mutedTextClass}`}>Tracked Contact</p>
-                        <h3 className={`mt-3 tech-display text-lg sm:text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{blurredNumber}</h3>
+                        <h3 className={`mt-1.5 tech-display text-lg sm:text-xl ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{blurredNumber}</h3>
                     </div>
 
                     <div className={clsx(
@@ -275,7 +295,8 @@ export function ContactCard({
                         {analyticsSummary.map((item) => (
                             <div key={item.label} className="min-w-0 xl:px-4 xl:first:pl-0 xl:last:pr-0">
                                 <div className={`fine-copy text-[9px] ${mutedTextClass}`}>{item.label}</div>
-                                <div className={`mt-1 text-[11px] leading-relaxed ${supportTextClass}`}>{item.hint}</div>
+                                <div className={`mt-1 text-[13px] font-medium leading-tight ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>{item.value}</div>
+                                <div className={`mt-0.5 text-[11px] leading-relaxed ${mutedTextClass}`}>{item.hint}</div>
                             </div>
                         ))}
                     </div>
@@ -320,7 +341,7 @@ export function ContactCard({
                                 )}
                             </div>
                             <div className={clsx(
-                                "absolute bottom-2 right-[calc(50%-70px)] h-6 w-6 rounded-full border-2",
+                                "absolute bottom-2 right-[calc(50%-64px)] h-6 w-6 rounded-full border-2 sm:bottom-2 sm:right-[calc(50%-70px)]",
                                 isDarkMode ? 'border-slate-950' : 'border-[#f4eee3]',
                                 currentStatus === 'OFFLINE' ? "bg-rose-500" :
                                     isActiveState(currentStatus) ? "bg-emerald-400" :

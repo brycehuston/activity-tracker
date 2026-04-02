@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { BookOpenText, Plus } from 'lucide-react';
 import { socket, Platform } from '../App';
 import { ContactCard } from './ContactCard';
 
@@ -8,6 +8,7 @@ type ProbeMethod = 'delete' | 'reaction' | 'passive';
 interface DashboardProps {
     isDarkMode?: boolean;
     selectedPlatform: Platform;
+    onShowHowItWorks: () => void;
 }
 
 interface TrackerData {
@@ -56,7 +57,7 @@ interface ContactInfo {
     analytics: ActivityAnalytics | null;
 }
 
-export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardProps) {
+export function Dashboard({ isDarkMode = false, selectedPlatform, onShowHowItWorks }: DashboardProps) {
     const [inputNumber, setInputNumber] = useState('');
     const [contacts, setContacts] = useState<Map<string, ContactInfo>>(new Map());
     const [error, setError] = useState<string | null>(null);
@@ -342,21 +343,19 @@ export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardPro
     return (
         <div className="flex h-full min-h-full flex-1 flex-col gap-5">
             {/* Add Contact Form */}
-            <div className={`rounded-[30px] border px-4 py-4 sm:px-6 sm:py-5 motion-soft-reveal ${panelBaseClass}`}>
-                <div className="mb-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
-                    <div className="space-y-3">
+            <div className={`rounded-[30px] border px-4 py-3 sm:px-6 sm:py-4 motion-soft-reveal ${panelBaseClass}`}>
+                <div className="mb-4 grid gap-3 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                    <div className="space-y-1.5">
                         <p className={`fine-copy text-[11px] ${helperTextClass}`}>Target Control</p>
                         <div>
                             <h2 className="tech-display text-[1.7rem] font-semibold leading-none sm:text-[1.9rem]">Add A {selectedPlatformLabel} Target</h2>
-                            <p className={`mt-2 max-w-[700px] text-[13px] leading-relaxed sm:text-sm ${helperTextClass}`}>
-                                Pick a number, choose the probe behavior, and let the console watch response speed on the selected {selectedPlatformLabel.toLowerCase()} lane.
-                            </p>
                         </div>
                     </div>
 
-                    <div className="space-y-2.5">
+                    <div className="space-y-1.5">
                         <p className={`text-[10px] uppercase tracking-[0.16em] ${helperTextClass}`}>Probe Method</p>
-                        <div className={`inline-flex flex-wrap rounded-[16px] border p-1 ${controlClass}`}>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className={`inline-flex flex-wrap rounded-[16px] border p-1 ${controlClass}`}>
                             {probeOptions.map((option) => (
                                 <button
                                     key={option.key}
@@ -372,12 +371,21 @@ export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardPro
                                     {option.label}
                                 </button>
                             ))}
+                            </div>
+                            <button
+                                onClick={onShowHowItWorks}
+                                title="How It Works"
+                                className={`inline-flex h-[42px] min-w-[164px] items-center justify-center gap-1.5 rounded-[16px] border px-4 text-[10px] font-semibold uppercase tracking-[0.16em] transition ${controlClass} ${isDarkMode ? 'hover:bg-white/6' : 'hover:bg-white/70'}`}
+                            >
+                                <BookOpenText size={14} />
+                                <span>How It Works</span>
+                            </button>
                         </div>
                     </div>
                 </div>
 
-                <div className={`grid gap-3 rounded-[22px] border p-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center ${isDarkMode ? 'border-white/10 bg-black/10' : 'border-slate-300/55 bg-white/40'}`}>
-                    <label className={`flex min-h-[3.15rem] items-center gap-2.5 rounded-[14px] border px-3.5 sm:px-4 ${controlClass}`}>
+                <div className={`grid gap-2.5 rounded-[22px] border p-2 sm:p-2 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center ${isDarkMode ? 'border-white/10 bg-black/10' : 'border-slate-300/55 bg-white/40'}`}>
+                    <label className={`flex min-h-[3rem] items-center gap-2.5 rounded-[14px] border px-3.5 sm:px-4 ${controlClass}`}>
                         <span className={`tech-display text-sm ${helperTextClass}`}>ID</span>
                         <span className={`text-[10px] uppercase tracking-[0.16em] ${helperTextClass}`}>Target Number</span>
                         <div className={`flex h-8 min-w-0 flex-1 items-center rounded-[10px] border px-3 ${
@@ -396,7 +404,7 @@ export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardPro
 
                     <button
                         onClick={handleAdd}
-                        className={`inline-flex h-12 items-center justify-center gap-1.5 rounded-[14px] border px-4 text-[10px] font-semibold uppercase tracking-[0.16em] transition lg:min-w-[164px] ${
+                        className={`inline-flex h-[3rem] items-center justify-center gap-1.5 rounded-[14px] border px-4 text-[10px] font-semibold uppercase tracking-[0.16em] transition lg:min-w-[164px] ${
                             isDarkMode
                                 ? 'border-[#d2a757]/35 bg-[#d2a757]/14 text-[#f8dfad] hover:bg-[#d2a757]/22'
                                 : 'border-[#b48836]/35 bg-[#f7edd9] text-[#6d4a14] hover:bg-[#f2e2c2]'
@@ -406,7 +414,7 @@ export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardPro
                         Add {selectedPlatformLabel}
                     </button>
                 </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
                     <p className={`text-xs leading-relaxed ${helperTextClass}`}>
                         The selected platform sets the outbound lane for new targets. Existing targets keep their own platform assignment.
                     </p>

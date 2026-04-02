@@ -13,7 +13,7 @@ export function Login({ connectionState, isDarkMode = false }: LoginProps) {
     const textSecondaryClass = isDarkMode ? 'text-slate-300' : 'text-slate-600';
     const panelBgClass = isDarkMode ? 'border-white/10 bg-black/15' : 'border-slate-300/55 bg-white/45';
     const innerFrameClass = isDarkMode
-        ? 'border border-white/12 bg-[#070913]'
+        ? 'border border-white/10 bg-[#141518]'
         : 'border border-slate-300/60 bg-white/78';
 
     return (
@@ -100,12 +100,17 @@ export function Login({ connectionState, isDarkMode = false }: LoginProps) {
                         </p>
                     </>
                 ) : (
-                    <div className={`mb-5 flex min-h-[320px] flex-1 items-center justify-center rounded-[24px] border p-4 sm:p-6 ${panelBgClass}`}>
-                        <div className={`flex aspect-square w-full max-w-[288px] flex-col items-center justify-center rounded-[24px] px-6 text-center ${innerFrameClass}`}>
-                            <p className={`text-center text-sm font-semibold ${textPrimaryClass}`}>Signal API not available</p>
-                            <p className={`mt-2 max-w-xs text-center text-xs leading-relaxed ${textSecondaryClass}`}>Run the `signal-cli-rest-api` container to enable this lane.</p>
+                    <>
+                        <div className={`mb-5 flex min-h-[320px] flex-1 items-center justify-center rounded-[24px] border p-4 sm:p-6 ${panelBgClass}`}>
+                            <div className={`flex aspect-square w-full max-w-[288px] flex-col items-center justify-center rounded-[24px] px-6 text-center ${innerFrameClass}`}>
+                                <p className={`text-center text-sm font-semibold ${textPrimaryClass}`}>Signal API not available</p>
+                                <p className={`mt-2 max-w-xs text-center text-xs leading-relaxed ${textSecondaryClass}`}>Run the `signal-cli-rest-api` container to enable this lane.</p>
+                            </div>
                         </div>
-                    </div>
+                        <p className={`${textSecondaryClass} mt-auto max-w-md text-sm leading-relaxed`}>
+                            Open Signal on your phone, go to Settings {'>'} Linked Devices, and scan the QR code to connect.
+                        </p>
+                    </>
                 )}
             </div>
         </div>

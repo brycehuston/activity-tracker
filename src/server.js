@@ -45,6 +45,9 @@ const WHATSAPP_RECONNECT_DELAY_MS = 15000;
 function initializeClient() {
     client = new Client({
         authStrategy: new LocalAuth(),
+        authTimeoutMs: 60000,
+        takeoverOnConflict: true,
+        takeoverTimeoutMs: 0,
         puppeteer: {
             headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -62,6 +65,22 @@ function initializeClient() {
                 io.emit('qr', url);
             }
         });
+    });
+
+    client.on('authenticated', () => {
+        console.log('WhatsApp client authenticated');
+    });
+
+    client.on('auth_failure', (message) => {
+        console.error('WhatsApp authentication failure:', message);
+    });
+
+    client.on('loading_screen', (percent, message) => {
+        console.log(`WhatsApp loading screen: ${percent}% - ${message}`);
+    });
+
+    client.on('change_state', (state) => {
+        console.log('WhatsApp state changed:', state);
     });
 
     client.on('ready', () => {

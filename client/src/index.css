@@ -311,13 +311,13 @@ select {
     display: inline-flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.68rem;
-    width: 3.9rem;
+    gap: 0.95rem;
+    width: 5.7rem;
     height: 2.35rem;
     border-radius: 999px;
     border: 1px solid rgba(212, 167, 87, 0.34);
     background: rgba(255, 255, 255, 0.04);
-    padding: 0 0.56rem;
+    padding: 0 0.74rem;
     color: #dcc28f;
     transition: background-color 220ms ease, border-color 220ms ease;
 }
@@ -325,7 +325,7 @@ select {
 .theme-toggle-icon {
     position: relative;
     z-index: 2;
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     color: inherit;
     line-height: 1;
 }
@@ -343,7 +343,7 @@ select {
 }
 
 .theme-toggle.is-dark .theme-toggle-knob {
-    transform: translateX(1.56rem);
+    transform: translateX(3.35rem);
 }
 
 .theme-toggle.is-light {
@@ -517,9 +517,9 @@ select {
     }
 
     .theme-toggle {
-        width: 3.55rem;
+        width: 4.75rem;
         height: 2.2rem;
-        padding: 0 0.5rem;
+        padding: 0 0.62rem;
     }
 
     .theme-toggle-knob {
@@ -528,6 +528,6 @@ select {
     }
 
     .theme-toggle.is-dark .theme-toggle-knob {
-        transform: translateX(1.34rem);
+        transform: translateX(2.55rem);
     }
 }

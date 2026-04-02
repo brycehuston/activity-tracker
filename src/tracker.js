@@ -6,6 +6,7 @@ class WhatsAppTracker {
         this.number = number;
         this.isTracking = false;
         this.probeMethod = 'delete';
+        this.stealthMode = true;
         
         // RTT tracking
         this.probeStartTimes = new Map(); // messageId -> timestamp
@@ -13,11 +14,123 @@ class WhatsAppTracker {
         this.recentRtts = [];
         this.deviceState = 'Calibrating...';
         this.lastRtt = 0;
+        this.activityEvents = [];
+        this.lastInboundAt = null;
+        this.lastCallAt = null;
     }
 
     setProbeMethod(method) {
         this.probeMethod = method;
         console.log(`Probe method changed to: ${method}`);
+    }
+
+    setStealthMode(enabled) {
+        this.stealthMode = enabled;
+        console.log(`Stealth mode ${enabled ? 'enabled' : 'disabled'} for ${this.number}`);
+    }
+
+    pruneActivity(now = Date.now()) {
+        const dayAgo = now - 86400000;
+        this.activityEvents = this.activityEvents.filter((event) => event.timestamp >= dayAgo);
+    }
+
+    registerActivity(type, actorId) {
+        const now = Date.now();
+        this.activityEvents.push({
+            type,
+            actorId: actorId || this.number,
+            timestamp: now
+        });
+        this.pruneActivity(now);
+        if (type === 'message') {
+            this.lastInboundAt = now;
+        } else if (type === 'call') {
+            this.lastCallAt = now;
+        }
+    }
+
+    getActivityAnalytics() {
+        const now = Date.now();
+        const hourAgo = now - 3600000;
+        this.pruneActivity(now);
+
+        let messageCount1h = 0;
+        let messageCount24h = 0;
+        let callCount1h = 0;
+        let callCount24h = 0;
+        const actorCounts = new Map();
+        const callerCounts = new Map();
+
+        for (const event of this.activityEvents) {
+            if (event.type === 'message') {
+                messageCount24h += 1;
+                if (event.timestamp >= hourAgo) messageCount1h += 1;
+            }
+
+            if (event.type === 'call') {
+                callCount24h += 1;
+                if (event.timestamp >= hourAgo) callCount1h += 1;
+            }
+
+            actorCounts.set(event.actorId, (actorCounts.get(event.actorId) || 0) + 1);
+            if (event.type === 'call') {
+                callerCounts.set(event.actorId, (callerCounts.get(event.actorId) || 0) + 1);
+            }
+        }
+
+        let topSource = null;
+        let topSourceCount = 0;
+        for (const [actorId, count] of actorCounts.entries()) {
+            if (count > topSourceCount) {
+                topSource = actorId;
+                topSourceCount = count;
+            }
+        }
+
+        let repeatedCaller = null;
+        let repeatedCallerCount = 0;
+        for (const [actorId, count] of callerCounts.entries()) {
+            if (count > repeatedCallerCount) {
+                repeatedCaller = actorId;
+                repeatedCallerCount = count;
+            }
+        }
+
+        const fingerprint = (value) => {
+            if (!value) return null;
+            return value.replace(/\D/g, '').slice(-6).padStart(6, '*');
+        };
+
+        return {
+            messageCount1h,
+            messageCount24h,
+            callCount1h,
+            callCount24h,
+            repeatedCallerFingerprint: fingerprint(repeatedCaller),
+            repeatedCallerCount,
+            topSourceFingerprint: fingerprint(topSource),
+            topSourceEvents24h: topSourceCount,
+            lastInboundAt: this.lastInboundAt,
+            lastCallAt: this.lastCallAt
+        };
+    }
+
+    observeInboundMessage(message) {
+        if (!message || message.fromMe) return;
+        const incomingId = message.from || message.author || '';
+        if (incomingId === this.jid) {
+            this.registerActivity('message', this.number);
+            this.emitUpdate();
+        }
+    }
+
+    observeIncomingCall(call) {
+        if (!call) return;
+        const callerId = call.from || call.peerJid || '';
+        if (callerId === this.jid) {
+            this.registerActivity('call', this.number);
+            this.emitUpdate();
+        }
     }
 
     async startTracking() {
@@ -152,7 +265,8 @@ class WhatsAppTracker {
                 lastRtt: this.lastRtt,
                 avgRtt: Math.round(avgRtt),
                 median: Math.round(median),
-                measurements: this.rttHistory.length
+                measurements: this.rttHistory.length,
+                analytics: this.getActivityAnalytics()
             });
         }
     }
