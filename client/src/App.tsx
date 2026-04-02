@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { BookOpenText } from 'lucide-react';
 import { Login } from './components/Login';
@@ -19,6 +19,8 @@ export interface ConnectionState {
     whatsappQr: string | null;
 }
 
+const WHATSAPP_QR_GRACE_MS = 15000;
+
 function App() {
     const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
         if (typeof window === 'undefined') return false;
@@ -32,6 +34,7 @@ function App() {
     });
     const [showHowItWorks, setShowHowItWorks] = useState(false);
     const [selectedPlatform, setSelectedPlatform] = useState<Platform>('whatsapp');
+    const whatsappQrClearTimeoutRef = useRef<number | null>(null);
     const [connectionState, setConnectionState] = useState<ConnectionState>({
         whatsapp: false,
         signal: false,
@@ -64,27 +67,46 @@ function App() {
         : 'border-sky-500/52 bg-sky-200 text-sky-900 shadow-[0_0_14px_rgba(59,130,246,0.28)]';
 
     useEffect(() => {
+        function clearWhatsAppQrTimeout() {
+            if (whatsappQrClearTimeoutRef.current !== null) {
+                window.clearTimeout(whatsappQrClearTimeoutRef.current);
+                whatsappQrClearTimeoutRef.current = null;
+            }
+        }
+
+        function scheduleWhatsAppQrClear() {
+            clearWhatsAppQrTimeout();
+            whatsappQrClearTimeoutRef.current = window.setTimeout(() => {
+                setConnectionState(prev => ({ ...prev, whatsappQr: null }));
+                whatsappQrClearTimeoutRef.current = null;
+            }, WHATSAPP_QR_GRACE_MS);
+        }
+
         function onDisconnect() {
-            setConnectionState({
+            scheduleWhatsAppQrClear();
+            setConnectionState(prev => ({
+                ...prev,
                 whatsapp: false,
                 signal: false,
                 signalNumber: null,
                 signalApiAvailable: false,
-                signalQrImage: null,
-                whatsappQr: null
-            });
+                signalQrImage: null
+            }));
         }
 
         function onWhatsAppConnectionOpen() {
+            clearWhatsAppQrTimeout();
             setConnectionState(prev => ({ ...prev, whatsapp: true, whatsappQr: null }));
         }
 
         function onWhatsAppConnectionClose() {
-            setConnectionState(prev => ({ ...prev, whatsapp: false, whatsappQr: null }));
+            scheduleWhatsAppQrClear();
+            setConnectionState(prev => ({ ...prev, whatsapp: false }));
         }
 
         function onWhatsAppQr(qr: string) {
             console.log('[WHATSAPP] Received QR code');
+            clearWhatsAppQrTimeout();
             setConnectionState(prev => ({ ...prev, whatsappQr: qr }));
         }
 
@@ -122,12 +144,12 @@ function App() {
         socket.on('signal-api-status', onSignalApiStatus);
         socket.on('signal-qr-image', onSignalQrImage);
 
-        // Now connect after listeners are set up
         if (!socket.connected) {
             socket.connect();
         }
 
         return () => {
+            clearWhatsAppQrTimeout();
             socket.off('disconnect', onDisconnect);
             socket.off('qr', onWhatsAppQr);
             socket.off('connection-open', onWhatsAppConnectionOpen);

@@ -40,6 +40,7 @@ let signalApiAvailable = false;
 let currentSignalQrUrl = null;
 const trackers = new Map();
 const SIGNAL_API_URL = process.env.SIGNAL_API_URL || 'http://localhost:8080';
+const WHATSAPP_RECONNECT_DELAY_MS = 15000;
 
 function initializeClient() {
     client = new Client({
@@ -78,9 +79,9 @@ function initializeClient() {
 
         // Reconnect after delay
         setTimeout(() => {
-            console.log('Attempting to reconnect...');
+            console.log(`Attempting to reconnect in ${WHATSAPP_RECONNECT_DELAY_MS}ms...`);
             client.initialize().catch(err => console.error('Reconnection failed:', err));
-        }, 5000);
+        }, WHATSAPP_RECONNECT_DELAY_MS);
     });
 
     client.on('message', (message) => {
@@ -113,7 +114,7 @@ function initializeClient() {
     // Initialize
     client.initialize().catch(err => {
         console.error('Failed to initialize WhatsApp client:', err);
-        setTimeout(() => initializeClient(), 5000);
+        setTimeout(() => initializeClient(), WHATSAPP_RECONNECT_DELAY_MS);
     });
 }
 
