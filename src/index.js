@@ -12,28 +12,28 @@ const originalConsoleLog = console.log;
 const originalStdoutWrite = process.stdout.write.bind(process.stdout);
 
 // prevents Baileys from spamming the console
-const shouldSuppressOutput = (message: string): boolean => {
+const shouldSuppressOutput = (message) => {
     return message.includes('Closing session:') ||
-           message.includes('SessionEntry') ||
-           message.includes('_chains') ||
-           message.includes('registrationId') ||
-           message.includes('currentRatchet') ||
-           message.includes('ephemeralKeyPair') ||
-           message.includes('pendingPreKey') ||
-           message.includes('indexInfo') ||
-           message.includes('baseKey') ||
-           message.includes('remoteIdentityKey') ||
-           message.includes('lastRemoteEphemeralKey') ||
-           message.includes('previousCounter') ||
-           message.includes('rootKey') ||
-           message.includes('signedKeyId') ||
-           message.includes('preKeyId') ||
-           message.includes('<Buffer');
+        message.includes('SessionEntry') ||
+        message.includes('_chains') ||
+        message.includes('registrationId') ||
+        message.includes('currentRatchet') ||
+        message.includes('ephemeralKeyPair') ||
+        message.includes('pendingPreKey') ||
+        message.includes('indexInfo') ||
+        message.includes('baseKey') ||
+        message.includes('remoteIdentityKey') ||
+        message.includes('lastRemoteEphemeralKey') ||
+        message.includes('previousCounter') ||
+        message.includes('rootKey') ||
+        message.includes('signedKeyId') ||
+        message.includes('preKeyId') ||
+        message.includes('<Buffer');
 };
 
 if (!debugMode) {
     // Override console.log
-    console.log = (...args: any[]) => {
+    console.log = (...args) => {
         const message = String(args[0] || '');
         if (!shouldSuppressOutput(message)) {
             originalConsoleLog(...args);
@@ -41,7 +41,7 @@ if (!debugMode) {
     };
 
     // Override process.stdout.write to catch low-level output
-    process.stdout.write = ((chunk: any, encoding?: any, callback?: any): boolean => {
+    process.stdout.write = ((chunk, encoding, callback) => {
         const message = String(chunk);
         if (shouldSuppressOutput(message)) {
             // Suppress - but still call callback if provided
@@ -53,17 +53,17 @@ if (!debugMode) {
             return true;
         }
         return originalStdoutWrite(chunk, encoding, callback);
-    }) as typeof process.stdout.write;
+    });
 }
 
 // Now safe to import modules
-import '@whiskeysockets/baileys';
-import makeWASocket, { DisconnectReason, useMultiFileAuthState } from '@whiskeysockets/baileys';
-import { pino } from 'pino';
-import { Boom } from '@hapi/boom';
-import qrcode from 'qrcode-terminal';
-import { WhatsAppTracker } from './tracker.js';
-import * as readline from 'readline';
+const makeWASocket = require('@whiskeysockets/baileys').default;
+const { DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { pino } = require('pino');
+const { Boom } = require('@hapi/boom');
+const qrcode = require('qrcode-terminal');
+const { WhatsAppTracker } = require('./tracker');
+const readline = require('readline');
 
 if (debugMode) {
     originalConsoleLog('🔍 Debug mode enabled\n');
@@ -72,8 +72,8 @@ if (debugMode) {
     originalConsoleLog('💡 Tip: Use --debug or -d for detailed debug output\n');
 }
 
-let currentTargetJid: string | null = null;
-let currentTracker: WhatsAppTracker | null = null;
+let currentTargetJid = null;
+let currentTracker = null;
 
 async function connectToWhatsApp() {
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
@@ -103,7 +103,7 @@ async function connectToWhatsApp() {
                 currentTracker = null;
             }
 
-            const shouldReconnect = (lastDisconnect?.error as Boom)?.output?.statusCode !== DisconnectReason.loggedOut;
+            const shouldReconnect = (lastDisconnect?.error?.output?.statusCode) !== DisconnectReason.loggedOut;
             if (debugMode) {
                 originalConsoleLog('connection closed due to ', lastDisconnect?.error, ', reconnecting ', shouldReconnect);
             }
