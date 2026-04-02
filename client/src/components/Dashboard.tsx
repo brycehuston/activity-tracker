@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import {Eye, EyeOff, Plus, Trash2, Zap, MessageCircle, Settings} from 'lucide-react';
-import { socket, Platform, ConnectionState } from '../App';
+import { Plus } from 'lucide-react';
+import { socket, Platform } from '../App';
 import { ContactCard } from './ContactCard';
-import { Login } from './Login';
 
-type ProbeMethod = 'delete' | 'reaction';
+type ProbeMethod = 'delete' | 'reaction' | 'passive';
 
 interface DashboardProps {
-    connectionState: ConnectionState;
+    isDarkMode?: boolean;
+    selectedPlatform: Platform;
 }
 
 interface TrackerData {
@@ -16,6 +16,9 @@ interface TrackerData {
     median: number;
     threshold: number;
     state: string;
+    source?: 'phone' | 'desktop' | 'mixed' | 'unknown';
+    confidence?: number;
+    confidenceLabel?: string;
     timestamp: number;
 }
 
@@ -24,6 +27,19 @@ interface DeviceInfo {
     state: string;
     rtt: number;
     avg: number;
+}
+
+interface ActivityAnalytics {
+    messageCount1h: number;
+    messageCount24h: number;
+    callCount1h: number;
+    callCount24h: number;
+    repeatedCallerFingerprint: string | null;
+    repeatedCallerCount: number;
+    topSourceFingerprint: string | null;
+    topSourceEvents24h: number;
+    lastInboundAt: number | null;
+    lastCallAt: number | null;
 }
 
 interface ContactInfo {
@@ -36,18 +52,34 @@ interface ContactInfo {
     presence: string | null;
     profilePic: string | null;
     platform: Platform;
+    probeMode: 'active' | 'passive';
+    analytics: ActivityAnalytics | null;
 }
 
-export function Dashboard({ connectionState }: DashboardProps) {
+export function Dashboard({ isDarkMode = false, selectedPlatform }: DashboardProps) {
     const [inputNumber, setInputNumber] = useState('');
-    const [selectedPlatform, setSelectedPlatform] = useState<Platform>(
-        connectionState.whatsapp ? 'whatsapp' : 'signal'
-    );
     const [contacts, setContacts] = useState<Map<string, ContactInfo>>(new Map());
     const [error, setError] = useState<string | null>(null);
-    const [privacyMode, setPrivacyMode] = useState(false);
     const [probeMethod, setProbeMethod] = useState<ProbeMethod>('delete');
-    const [showConnections, setShowConnections] = useState(false);
+
+    const panelBaseClass = isDarkMode ? 'glass-dark text-slate-100' : 'glass-light text-slate-900';
+    const controlClass = isDarkMode
+        ? 'border-white/10 bg-white/[0.03] text-slate-100'
+        : 'border-slate-300/70 bg-white/55 text-slate-800';
+    const helperTextClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+    const quietTextClass = isDarkMode ? 'text-slate-300' : 'text-slate-700';
+    const selectedSegmentClass = isDarkMode
+        ? 'border border-[#d2a757]/55 bg-[#d2a757]/18 text-[#f8dfad] shadow-[0_0_18px_rgba(210,167,87,0.2)]'
+        : 'border border-[#b48836]/45 bg-[#ddb974]/26 text-[#6d4a14]';
+    const selectedPlatformLabel = selectedPlatform === 'signal' ? 'Signal' : 'WhatsApp';
+
+    function formatDisplayNumber(jid: string, platform: Platform) {
+        if (platform === 'signal') {
+            return jid.replace('signal:', '');
+        }
+
+        return jid.split('@')[0];
+    }
 
     useEffect(() => {
         function onTrackerUpdate(update: any) {
@@ -56,37 +88,97 @@ export function Dashboard({ connectionState }: DashboardProps) {
 
             setContacts(prev => {
                 const next = new Map(prev);
-                const contact = next.get(jid);
+                const platform = (data.platform || 'whatsapp') as Platform;
+                const contact = next.get(jid) || {
+                    jid,
+                    displayNumber: formatDisplayNumber(jid, platform),
+                    contactName: formatDisplayNumber(jid, platform),
+                    data: [],
+                    devices: [],
+                    deviceCount: 0,
+                    presence: null,
+                    profilePic: null,
+                    platform,
+                    probeMode: 'active' as const,
+                    analytics: null
+                };
 
-                if (contact) {
-                    // Update existing contact
-                    const updatedContact = { ...contact };
+                const derivedDevices: DeviceInfo[] = Array.isArray(data.devices) && data.devices.length > 0
+                    ? data.devices
+                    : data.lastRtt !== undefined || data.avgRtt !== undefined || data.state
+                        ? [{
+                            jid,
+                            state: data.state || 'Calibrating...',
+                            rtt: data.lastRtt ?? 0,
+                            avg: data.avgRtt ?? data.lastRtt ?? 0
+                        }]
+                        : contact.devices;
 
-                    if (data.presence !== undefined) {
-                        updatedContact.presence = data.presence;
-                    }
-                    if (data.deviceCount !== undefined) {
-                        updatedContact.deviceCount = data.deviceCount;
-                    }
-                    if (data.devices !== undefined) {
-                        updatedContact.devices = data.devices;
-                    }
+                const updatedContact: ContactInfo = {
+                    ...contact,
+                    platform,
+                    presence: data.presence !== undefined ? data.presence : contact.presence,
+                    deviceCount: data.deviceCount !== undefined ? data.deviceCount : derivedDevices.length || contact.deviceCount,
+                    devices: derivedDevices,
+                    probeMode: data.probeMode === 'passive' ? 'passive' : 'active',
+                    analytics: data.analytics || contact.analytics
+                };
 
-                    // Add to chart data
-                    if (data.median !== undefined && data.devices && data.devices.length > 0) {
-                        const newDataPoint: TrackerData = {
-                            rtt: data.devices[0].rtt,
-                            avg: data.devices[0].avg,
-                            median: data.median,
-                            threshold: data.threshold,
-                            state: data.devices.find((d: DeviceInfo) => d.state.includes('Online'))?.state || data.devices[0].state,
-                            timestamp: Date.now(),
-                        };
-                        updatedContact.data = [...updatedContact.data, newDataPoint];
-                    }
-
+                if (data.probeMode === 'passive' && data.analytics) {
+                    const activity1h = (data.analytics.messageCount1h || 0) + (data.analytics.callCount1h || 0) * 2;
+                    const recentBoost = data.analytics.lastInboundAt && (Date.now() - data.analytics.lastInboundAt) < 90000 ? 2 : 0;
+                    const eventScore = Math.max(1, activity1h + recentBoost);
+                    const baseline = Math.max(1, Math.round(((data.analytics.messageCount24h || 0) + (data.analytics.callCount24h || 0) * 2) / 6));
+                    const threshold = Math.max(1, baseline);
+                    const previousAvg = contact.data.length > 0 ? contact.data[contact.data.length - 1].avg : eventScore;
+                    const avg = Math.max(1, Math.round((previousAvg * 0.7) + (eventScore * 0.3)));
+                    const passivePoint: TrackerData = {
+                        rtt: eventScore,
+                        avg,
+                        median: baseline,
+                        threshold,
+                        state: data.state || 'Inconclusive',
+                        source: data.source,
+                        confidence: data.confidence,
+                        confidenceLabel: data.confidenceLabel,
+                        timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now()
+                    };
+                    updatedContact.data = [...contact.data, passivePoint].slice(-100);
                     next.set(jid, updatedContact);
+                    return next;
                 }
+
+                if (derivedDevices.length > 0) {
+                    const primaryDevice = derivedDevices.find((device) => device.state.includes('Active'))
+                        || derivedDevices.find((device) => device.state.includes('Online'))
+                        || derivedDevices[0];
+                    const rttValue = Number.isFinite(primaryDevice.rtt) ? primaryDevice.rtt : 0;
+                    const avgValue = Number.isFinite(primaryDevice.avg) ? primaryDevice.avg : 0;
+                    if (rttValue <= 0 && avgValue <= 0) {
+                        next.set(jid, updatedContact);
+                        return next;
+                    }
+                    const fallbackMedian = Math.max(1, Math.round(avgValue || rttValue || 1));
+                    const medianValue = (data.median !== undefined && data.median > 0) ? data.median : fallbackMedian;
+                    const threshold = data.threshold !== undefined
+                        ? data.threshold
+                        : Math.max(1, Math.round(medianValue * 0.9));
+                    const newDataPoint: TrackerData = {
+                        rtt: rttValue,
+                        avg: avgValue,
+                        median: medianValue,
+                        threshold,
+                        state: data.state || primaryDevice.state,
+                        source: data.source,
+                        confidence: data.confidence,
+                        confidenceLabel: data.confidenceLabel,
+                        timestamp: typeof data.timestamp === 'number' ? data.timestamp : Date.now(),
+                    };
+
+                    updatedContact.data = [...contact.data, newDataPoint].slice(-100);
+                }
+
+                next.set(jid, updatedContact);
 
                 return next;
             });
@@ -95,10 +187,20 @@ export function Dashboard({ connectionState }: DashboardProps) {
         function onProfilePic(data: { jid: string, url: string | null }) {
             setContacts(prev => {
                 const next = new Map(prev);
-                const contact = next.get(data.jid);
-                if (contact) {
-                    next.set(data.jid, { ...contact, profilePic: data.url });
-                }
+                const contact = next.get(data.jid) || {
+                    jid: data.jid,
+                    displayNumber: formatDisplayNumber(data.jid, 'whatsapp'),
+                    contactName: formatDisplayNumber(data.jid, 'whatsapp'),
+                    data: [],
+                    devices: [],
+                    deviceCount: 0,
+                    presence: null,
+                    profilePic: null,
+                    platform: 'whatsapp' as Platform,
+                    probeMode: 'active' as const,
+                    analytics: null
+                };
+                next.set(data.jid, { ...contact, profilePic: data.url });
                 return next;
             });
         }
@@ -106,10 +208,20 @@ export function Dashboard({ connectionState }: DashboardProps) {
         function onContactName(data: { jid: string, name: string }) {
             setContacts(prev => {
                 const next = new Map(prev);
-                const contact = next.get(data.jid);
-                if (contact) {
-                    next.set(data.jid, { ...contact, contactName: data.name });
-                }
+                const contact = next.get(data.jid) || {
+                    jid: data.jid,
+                    displayNumber: formatDisplayNumber(data.jid, 'whatsapp'),
+                    contactName: formatDisplayNumber(data.jid, 'whatsapp'),
+                    data: [],
+                    devices: [],
+                    deviceCount: 0,
+                    presence: null,
+                    profilePic: null,
+                    platform: 'whatsapp' as Platform,
+                    probeMode: 'active' as const,
+                    analytics: null
+                };
+                next.set(data.jid, { ...contact, contactName: data.name });
                 return next;
             });
         }
@@ -126,7 +238,9 @@ export function Dashboard({ connectionState }: DashboardProps) {
                     deviceCount: 0,
                     presence: null,
                     profilePic: null,
-                    platform: data.platform || 'whatsapp'
+                    platform: data.platform || 'whatsapp',
+                    probeMode: 'active',
+                    analytics: null
                 });
                 return next;
             });
@@ -172,7 +286,9 @@ export function Dashboard({ connectionState }: DashboardProps) {
                             deviceCount: 0,
                             presence: null,
                             profilePic: null,
-                            platform
+                            platform,
+                            probeMode: 'active',
+                            analytics: null
                         });
                     }
                 });
@@ -217,160 +333,123 @@ export function Dashboard({ connectionState }: DashboardProps) {
         socket.emit('set-probe-method', method);
     };
 
+    const probeOptions: { key: ProbeMethod; label: string }[] = [
+        { key: 'delete', label: 'Delete' },
+        { key: 'reaction', label: 'Reaction' },
+        { key: 'passive', label: 'Passive' }
+    ];
+
     return (
-        <div className="space-y-6">
+        <div className="flex h-full min-h-full flex-1 flex-col gap-5">
             {/* Add Contact Form */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-xl font-semibold text-gray-900">Track Contacts</h2>
-                        {/* Manage Connections button */}
-                        <button
-                            onClick={() => setShowConnections(!showConnections)}
-                            className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors flex items-center gap-1 ${
-                                showConnections
-                                    ? 'bg-gray-700 text-white'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                        >
-                            <Settings size={14} />
-                            {showConnections ? 'Hide Connections' : 'Manage Connections'}
-                        </button>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        {/* Probe Method Toggle */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Probe Method:</span>
-                            <div className="flex rounded-lg overflow-hidden border border-gray-300">
-                                <button
-                                    onClick={() => handleProbeMethodChange('delete')}
-                                    className={`px-3 py-1.5 text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
-                                        probeMethod === 'delete'
-                                            ? 'bg-purple-600 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                    title="Silent Delete Probe - Completely covert, target sees nothing"
-                                >
-                                    <Trash2 size={14} />
-                                    Delete
-                                </button>
-                                <button
-                                    onClick={() => handleProbeMethodChange('reaction')}
-                                    className={`px-3 py-1.5 text-sm font-medium transition-all duration-200 flex items-center gap-1 ${
-                                        probeMethod === 'reaction'
-                                            ? 'bg-yellow-500 text-white'
-                                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                    }`}
-                                    title="Reaction Probe - Sends reactions to non-existent messages"
-                                >
-                                    <Zap size={14} />
-                                    Reaction
-                                </button>
-                            </div>
+            <div className={`rounded-[30px] border px-4 py-4 sm:px-6 sm:py-5 motion-soft-reveal ${panelBaseClass}`}>
+                <div className="mb-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_auto] 2xl:items-start">
+                    <div className="space-y-3">
+                        <p className={`fine-copy text-[11px] ${helperTextClass}`}>Target Control</p>
+                        <div>
+                            <h2 className="tech-display text-[1.7rem] font-semibold leading-none sm:text-[1.9rem]">Add A {selectedPlatformLabel} Target</h2>
+                            <p className={`mt-2 max-w-[700px] text-[13px] leading-relaxed sm:text-sm ${helperTextClass}`}>
+                                Pick a number, choose the probe behavior, and let the console watch response speed on the selected {selectedPlatformLabel.toLowerCase()} lane.
+                            </p>
                         </div>
-                        {/* Privacy Mode Toggle */}
-                        <button
-                            onClick={() => setPrivacyMode(!privacyMode)}
-                            className={`px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-all duration-200 ${
-                                privacyMode 
-                                    ? 'bg-green-600 text-white hover:bg-green-700 shadow-md' 
-                                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                            }`}
-                            title={privacyMode ? 'Privacy Mode: ON (Click to disable)' : 'Privacy Mode: OFF (Click to enable)'}
-                        >
-                            {privacyMode ? (
-                                <>
-                                    <EyeOff size={20} />
-                                    <span>Privacy ON</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Eye size={20} />
-                                    <span>Privacy OFF</span>
-                                </>
-                            )}
-                        </button>
+                    </div>
+
+                    <div className="space-y-2.5">
+                        <p className={`text-[10px] uppercase tracking-[0.16em] ${helperTextClass}`}>Probe Method</p>
+                        <div className={`inline-flex flex-wrap rounded-[16px] border p-1 ${controlClass}`}>
+                            {probeOptions.map((option) => (
+                                <button
+                                    key={option.key}
+                                    onClick={() => handleProbeMethodChange(option.key)}
+                                    className={`rounded-[12px] px-3.5 py-2 text-xs font-semibold transition ${
+                                        probeMethod === option.key
+                                            ? selectedSegmentClass
+                                            : isDarkMode
+                                                ? `${quietTextClass} hover:bg-white/6`
+                                                : `${quietTextClass} hover:bg-white/70`
+                                    }`}
+                                >
+                                    {option.label}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
-                <div className="flex gap-4">
-                    {/* Platform Selector */}
-                    <div className="flex rounded-lg overflow-hidden border border-gray-300">
-                        <button
-                            onClick={() => setSelectedPlatform('whatsapp')}
-                            disabled={!connectionState.whatsapp}
-                            className={`px-4 py-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                                selectedPlatform === 'whatsapp'
-                                    ? 'bg-green-600 text-white'
-                                    : connectionState.whatsapp
-                                        ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            }`}
-                            title={connectionState.whatsapp ? 'WhatsApp' : 'WhatsApp not connected'}
-                        >
-                            <MessageCircle size={16} />
-                            WhatsApp
-                        </button>
-                        <button
-                            onClick={() => setSelectedPlatform('signal')}
-                            disabled={!connectionState.signal}
-                            className={`px-4 py-2 text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                                selectedPlatform === 'signal'
-                                    ? 'bg-blue-600 text-white'
-                                    : connectionState.signal
-                                        ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                            }`}
-                            title={connectionState.signal ? 'Signal' : 'Signal not connected'}
-                        >
-                            <MessageCircle size={16} />
-                            Signal
-                        </button>
-                    </div>
-                    <input
-                        type="text"
-                        placeholder="Enter phone number (e.g. 491701234567)"
-                        className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        value={inputNumber}
-                        onChange={(e) => setInputNumber(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && handleAdd()}
-                    />
+
+                <div className={`grid gap-3 rounded-[22px] border p-2 sm:p-2.5 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center ${isDarkMode ? 'border-white/10 bg-black/10' : 'border-slate-300/55 bg-white/40'}`}>
+                    <label className={`flex min-h-[3.15rem] items-center gap-2.5 rounded-[14px] border px-3.5 sm:px-4 ${controlClass}`}>
+                        <span className={`tech-display text-sm ${helperTextClass}`}>ID</span>
+                        <span className={`text-[10px] uppercase tracking-[0.16em] ${helperTextClass}`}>Target Number</span>
+                        <div className={`flex h-8 min-w-0 flex-1 items-center rounded-[10px] border px-3 ${
+                            isDarkMode ? 'border-white/12 bg-black/20' : 'border-slate-300/70 bg-white/70'
+                        }`}>
+                            <input
+                                type="text"
+                                placeholder={`Enter a ${selectedPlatformLabel} number`}
+                                className={`w-full bg-transparent text-[14px] font-semibold outline-none placeholder:font-medium ${quietTextClass} ${isDarkMode ? 'placeholder:text-slate-500' : 'placeholder:text-slate-400'}`}
+                                value={inputNumber}
+                                onChange={(e) => setInputNumber(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                            />
+                        </div>
+                    </label>
+
                     <button
                         onClick={handleAdd}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium transition-colors"
+                        className={`inline-flex h-12 items-center justify-center gap-1.5 rounded-[14px] border px-4 text-[10px] font-semibold uppercase tracking-[0.16em] transition lg:min-w-[164px] ${
+                            isDarkMode
+                                ? 'border-[#d2a757]/35 bg-[#d2a757]/14 text-[#f8dfad] hover:bg-[#d2a757]/22'
+                                : 'border-[#b48836]/35 bg-[#f7edd9] text-[#6d4a14] hover:bg-[#f2e2c2]'
+                        }`}
                     >
-                        <Plus size={20} /> Add Contact
+                        <Plus size={14} />
+                        Add {selectedPlatformLabel}
                     </button>
                 </div>
-                {error && <p className="mt-2 text-red-500 text-sm">{error}</p>}
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className={`text-xs leading-relaxed ${helperTextClass}`}>
+                        The selected platform sets the outbound lane for new targets. Existing targets keep their own platform assignment.
+                    </p>
+                    {error && <p className="text-sm text-rose-400">{error}</p>}
+                </div>
             </div>
-
-            {/* Connections Panel */}
-            {showConnections && (
-                <Login connectionState={connectionState} />
-            )}
 
             {/* Contact Cards */}
             {contacts.size === 0 ? (
-                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-12 text-center">
-                    <p className="text-gray-500 text-lg">No contacts being tracked</p>
-                    <p className="text-gray-400 text-sm mt-2">Add a contact above to start tracking</p>
+                <div className="flex min-h-0 flex-1 items-stretch">
+                    <div className={`${panelBaseClass} motion-soft-reveal flex h-full min-h-0 flex-1 items-center justify-center rounded-[34px] border border-dashed px-8 py-12 text-center md:px-12 md:py-14`}>
+                        <div className="max-w-[760px]">
+                            <p className={`fine-copy text-[11px] ${helperTextClass}`}>Waiting For A Tracked Target</p>
+                            <p className="tech-display mt-4 text-[2rem] leading-none sm:text-[2.4rem]">No Active Targets</p>
+                            <p className={`mx-auto mt-4 max-w-2xl text-[15px] leading-relaxed ${helperTextClass}`}>
+                                Add a number and the workspace will start resolving RTT movement, platform context, and device-state behavior into one readable lane.
+                            </p>
+                        </div>
+                    </div>
                 </div>
             ) : (
-                <div className="space-y-6">
-                    {Array.from(contacts.values()).map(contact => (
-                        <ContactCard
+                <div className="space-y-5">
+                    {Array.from(contacts.values()).map((contact, index) => (
+                        <div
                             key={contact.jid}
-                            jid={contact.jid}
-                            displayNumber={contact.contactName}
-                            data={contact.data}
-                            devices={contact.devices}
-                            deviceCount={contact.deviceCount}
-                            presence={contact.presence}
-                            profilePic={contact.profilePic}
-                            onRemove={() => handleRemove(contact.jid)}
-                            privacyMode={privacyMode}
-                            platform={contact.platform}
-                        />
+                            className={`motion-soft-reveal ${index === 0 ? 'motion-delay-1' : index === 1 ? 'motion-delay-2' : 'motion-delay-3'}`}
+                        >
+                            <ContactCard
+                                jid={contact.jid}
+                                displayNumber={contact.contactName}
+                                data={contact.data}
+                                devices={contact.devices}
+                                deviceCount={contact.deviceCount}
+                                presence={contact.presence}
+                                profilePic={contact.profilePic}
+                                onRemove={() => handleRemove(contact.jid)}
+                                privacyMode={false}
+                                platform={contact.platform}
+                                isDarkMode={isDarkMode}
+                                probeMode={contact.probeMode}
+                                analytics={contact.analytics}
+                            />
+                        </div>
                     ))}
                 </div>
             )}

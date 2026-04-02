@@ -1,4 +1,4 @@
-# Device Activity Tracker - WhatsApp Edition
+# Device Activity Tracker - WhatsApp Edition 📱
 
 > **A proof-of-concept tool demonstrating privacy vulnerabilities in WhatsApp through Round-Trip Time (RTT) analysis**
 
@@ -8,19 +8,19 @@ This project detects user activity patterns on WhatsApp by measuring message del
 
 ---
 
-## What It Does
+## What It Does 🔍
 
 The tool connects to WhatsApp as a linked device and sends invisible probe messages every 2-3 seconds. By measuring the time it takes for WhatsApp to acknowledge these messages (RTT), it can detect:
 
-- **Online (Green):** Device actively in use - RTT < 500ms
-- **Standby (Yellow):** Device idle/locked - RTT 500-2000ms  
-- **Offline (Red):** Device unreachable - RTT timeout after 10 seconds
+- **Online (Green) 🟢:** Device actively in use - RTT < 500ms
+- **Standby (Yellow) 🟡:** Device idle/locked - RTT 500-2000ms  
+- **Offline (Red) 🔴:** Device unreachable - RTT timeout after 10 seconds
 
 The RTT analysis creates a real-time graph showing device state changes and activity patterns over time.
 
 ---
 
-## The WhatsApp Problem (And How We Fixed It)
+## The WhatsApp Problem (And How We Fixed It) 🛠️
 
 ### The Original Issue
 
@@ -30,7 +30,7 @@ The research was based on the **Baileys library** (`@adiwajshing/baileys`), whic
 2. **WhatsApp actively blocks it** - They've hardened their servers to reject Baileys connections at the NOISE protocol level
 3. **Existing forks were also dead** - Even the community-maintained `@whiskeysockets/baileys` couldn't get past WhatsApp's blocking
 
-### Our Solution: Browser Automation (Puppeteer)
+### Our Solution: Browser Automation (Puppeteer) 🤖
 
 Instead of trying to reverse-engineer the protocol, we pivoted to **whatsapp-web.js**, which uses **Puppeteer to automate an actual Chrome browser** running WhatsApp Web.
 
@@ -47,15 +47,15 @@ Instead of trying to reverse-engineer the protocol, we pivoted to **whatsapp-web
 
 ---
 
-## Installation
+## Installation 🚀
 
-### Prerequisites
+### Prerequisites 📦
 
 - Docker & Docker Compose
 - Node.js 20+ (for local development)
 - 2GB+ free disk space (for Chromium)
 
-### Quick Start (Docker - Recommended)
+### Quick Start (Docker - Recommended) 🐳
 
 ```bash
 # Clone the repo
@@ -70,7 +70,7 @@ docker compose up -d
 # Backend API: http://localhost:3001
 ```
 
-### Linking WhatsApp
+### Linking WhatsApp 🔗
 
 1. Open `http://localhost:3000` in your browser
 2. You'll see a QR code for WhatsApp linking
@@ -79,7 +79,7 @@ docker compose up -d
 5. Scan the QR code with your phone
 6. The backend will authenticate and you're ready to track
 
-### Manual Setup (Local Development)
+### Manual Setup (Local Development) 💻
 
 ```bash
 # Backend
@@ -94,16 +94,16 @@ npm start  # Starts on port 3000
 
 ---
 
-## Usage
+## Usage 🎯
 
-### Web Interface
+### Web Interface 🖥️
 
 1. **Link WhatsApp** - Scan the QR code to authenticate
 2. **Enter Contact Number** - Input the phone number you want to track (e.g., 491701234567)
 3. **Real-Time Monitoring** - Watch the RTT metrics update as messages are delivered
 4. **Switch Probe Methods** - Toggle between "Delete" (covert) and "Reaction" (visible) probes
 
-### What Each Metric Means
+### What Each Metric Means 📊
 
 | Metric | Description |
 |--------|-------------|
@@ -112,16 +112,16 @@ npm start  # Starts on port 3000
 | **Threshold** | 90% of median - detection boundary |
 | **RTT History** | Graph showing RTT pattern over time |
 
-### Probe Methods
+### Probe Methods 🧪
 
 - **Delete** (Default): Sends a delete request for a non-existent message - completely invisible
 - **Reaction**: Sends a reaction emoji - may be visible depending on WhatsApp version
 
 ---
 
-## How It Works Technically
+## How It Works Technically ⚙️
 
-### Architecture
+### Architecture 🧱
 
 ```
 ┌─────────────────┐
@@ -150,7 +150,7 @@ npm start  # Starts on port 3000
     └───────────────────────┘
 ```
 
-### RTT Measurement Flow
+### RTT Measurement Flow ⏱️
 
 1. **Backend** sends probe message to target contact every 2-3 seconds
 2. **WhatsApp Server** delivers message to user's device
@@ -158,7 +158,7 @@ npm start  # Starts on port 3000
 4. **Backend** measures time between send and ACK = RTT
 5. **Frontend** displays metrics and updates graph in real-time
 
-### Device State Detection Algorithm
+### Device State Detection Algorithm 🧠
 
 ```javascript
 // Calculate threshold as 90% of median RTT
@@ -176,16 +176,16 @@ if (avgRtt < threshold) {
 
 ---
 
-## Docker Setup Details
+## Docker Setup Details 🐋
 
-### Why Chromium in Docker?
+### Why Chromium in Docker? 🌐
 
 Whatsapp-web.js requires a real Chrome/Chromium browser to automate. The Dockerfile installs:
 - **Chromium** - Lightweight Chrome alternative
 - **Dependencies** - GTK, fonts, audio/video libs
 - **Sandboxing flags** - `--no-sandbox` for container environment
 
-### Building Custom Docker Images
+### Building Custom Docker Images 🔨
 
 ```bash
 # Rebuild everything
@@ -202,32 +202,32 @@ docker logs device-activity-tracker-client-1 -f
 
 ---
 
-## Troubleshooting
+## Troubleshooting 🩺
 
-### "WhatsApp is not connected"
+### "WhatsApp is not connected" ❌
 - The frontend doesn't see a successful WhatsApp connection
 - Make sure you scanned the QR code completely
 - Try re-linking by refreshing the page
 
-### "Failed to send probe: Invalid value"
+### "Failed to send probe: Invalid value" ⚠️
 - The message format was incorrect for the whatsapp-web.js library
 - Restart the backend: `docker compose restart backend`
 
-### "No RTT data appearing"
+### "No RTT data appearing" 📉
 - The backend is sending probes but not receiving ACKs
 - Possible causes:
   - Contact doesn't exist or isn't on WhatsApp
   - WhatsApp Web is blocking the connection
   - Try restarting Docker: `docker compose down && docker compose up -d`
 
-### Browser crashes on page load
+### Browser crashes on page load 💥
 - React build might be cached
 - Hard refresh: **Ctrl+Shift+R** (or **Cmd+Shift+R** on Mac)
 - Or clear cache and rebuild client: `docker compose down && docker image rm device-activity-tracker-client:latest`
 
 ---
 
-## Project Structure
+## Project Structure 🗂️
 
 ```
 device-activity-tracker/
@@ -249,7 +249,7 @@ device-activity-tracker/
 
 ---
 
-## Key Technologies
+## Key Technologies 🧰
 
 | Technology | Purpose |
 |-----------|---------|
@@ -264,7 +264,7 @@ device-activity-tracker/
 
 ---
 
-## Security & Privacy Notes
+## Security & Privacy Notes 🔐
 
 ⚠️ **This is a research proof-of-concept only.** Using this tool to track others without consent may violate:
 - Computer Fraud and Abuse Act (CFAA)
@@ -278,7 +278,7 @@ This project demonstrates a real vulnerability in WhatsApp's design. It should o
 
 ---
 
-## Contributing
+## Contributing 🤝
 
 Found improvements or fixes? Submit a PR! Areas we need help with:
 - Better RTT analysis algorithms
@@ -288,13 +288,13 @@ Found improvements or fixes? Submit a PR! Areas we need help with:
 
 ---
 
-## License
+## License 📄
 
 MIT - See LICENSE file for details
 
 ---
 
-## Acknowledgments
+## Acknowledgments 🙏
 
 - **Original Research:** Gegenhuber et al. (University of Vienna & SBA Research)
 - **Baileys Library:** The original reverse-engineering work (now archived)
@@ -302,9 +302,8 @@ MIT - See LICENSE file for details
 
 ---
 
-## Disclaimer
+## Disclaimer ⚠️
 
 This tool is provided for educational and authorized security research only. Unauthorized access to computer systems or user surveillance is illegal. The authors assume no liability for misuse.
 
 **For legal tracking:** Use official WhatsApp Business API with proper consent and compliance.
-# activity-tracker

@@ -1,0 +1,100 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <g filter="url(#shadow)">
+    <path
+      d="M70 468L258 52L431 468L336 418L260 236L167 440L70 468Z"
+      fill="url(#goldBody)"
+    />
+    <path
+      d="M255 52L431 468L382 429L238 89L255 52Z"
+      fill="url(#goldHighlight)"
+    />
+    <path
+      d="M258 52L70 468L116 435L273 90L258 52Z"
+      fill="url(#goldSide)"
+    />
+    <path
+      d="M226 179L337 410L288 384L226 251L164 397L122 410L226 179Z"
+      fill="#050505"
+    />
+    <path
+      d="M186 339C240 295 304 265 372 251C399 245 427 243 454 245L387 287C328 296 272 318 221 352L186 339Z"
+      fill="url(#goldSweep)"
+    />
+    <path
+      d="M308 315H391L454 245L345 344L308 315Z"
+      fill="url(#goldEdge)"
+    />
+    <path
+      d="M337 324L431 468L336 418C315 407 299 391 289 371L337 324Z"
+      fill="url(#goldTail)"
+    />
+    <path
+      d="M186 339C241 313 299 294 360 284C390 279 420 277 450 278"
+      stroke="url(#rimLight)"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+    <path
+      d="M86 463L258 73"
+      stroke="url(#rimLight)"
+      stroke-width="5"
+      stroke-linecap="round"
+    />
+    <path
+      d="M258 73L422 456"
+      stroke="#FFF0B5"
+      stroke-width="4"
+      stroke-linecap="round"
+      stroke-opacity="0.55"
+    />
+  </g>
+  <defs>
+    <linearGradient id="goldBody" x1="115" y1="93" x2="380" y2="438" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF7C7"/>
+      <stop offset="0.3" stop-color="#F6DE88"/>
+      <stop offset="0.62" stop-color="#C59243"/>
+      <stop offset="1" stop-color="#6D461E"/>
+    </linearGradient>
+    <linearGradient id="goldHighlight" x1="274" y1="71" x2="404" y2="402" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF9D4"/>
+      <stop offset="0.26" stop-color="#F7E59D"/>
+      <stop offset="0.68" stop-color="#C79345"/>
+      <stop offset="1" stop-color="#7C5124"/>
+    </linearGradient>
+    <linearGradient id="goldSide" x1="92" y1="445" x2="249" y2="95" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6F481F"/>
+      <stop offset="0.42" stop-color="#B9853D"/>
+      <stop offset="1" stop-color="#F2D47B"/>
+    </linearGradient>
+    <linearGradient id="goldSweep" x1="194" y1="349" x2="433" y2="250" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7E5523"/>
+      <stop offset="0.28" stop-color="#D09E4B"/>
+      <stop offset="0.62" stop-color="#FFF0A5"/>
+      <stop offset="1" stop-color="#A56E2D"/>
+    </linearGradient>
+    <linearGradient id="goldEdge" x1="318" y1="329" x2="438" y2="255" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F4DA84"/>
+      <stop offset="0.55" stop-color="#C18B3F"/>
+      <stop offset="1" stop-color="#6A441B"/>
+    </linearGradient>
+    <linearGradient id="goldTail" x1="305" y1="357" x2="425" y2="456" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#E3BF69"/>
+      <stop offset="0.45" stop-color="#A87435"/>
+      <stop offset="1" stop-color="#5C3917"/>
+    </linearGradient>
+    <linearGradient id="rimLight" x1="123" y1="104" x2="421" y2="310" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFCE3"/>
+      <stop offset="0.42" stop-color="#FFECA1"/>
+      <stop offset="1" stop-color="#D59E43"/>
+    </linearGradient>
+    <filter id="shadow" x="50" y="38" width="426" height="448" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feFlood flood-opacity="0" result="BackgroundImageFix"/>
+      <feColorMatrix in="SourceAlpha" type="matrix" values="0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 127 0" result="hardAlpha"/>
+      <feOffset dy="3"/>
+      <feGaussianBlur stdDeviation="7"/>
+      <feColorMatrix type="matrix" values="0 0 0 0 0.905882 0 0 0 0 0.701961 0 0 0 0 0.290196 0 0 0 0.34 0"/>
+      <feBlend mode="screen" in2="BackgroundImageFix" result="effect1_dropShadow_1_2"/>
+      <feBlend mode="normal" in="SourceGraphic" in2="effect1_dropShadow_1_2" result="shape"/>
+    </filter>
+  </defs>
+</svg>
